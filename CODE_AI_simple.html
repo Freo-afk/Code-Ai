@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CODE AI — помощник программиста</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090b13;color:#f4f5fb;font-family:Arial,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;padding:20px 5%;border-bottom:1px solid #292e43}
+.logo{font-size:25px;font-weight:bold;color:#b59aff}.logo span{color:#ffd45c}
+button,select{border:0;border-radius:9px;padding:11px 14px;color:white;background:#292e43;cursor:pointer}
+button:hover{filter:brightness(1.15)}.primary{background:#8957f5;font-weight:bold}
+main{max-width:1250px;margin:auto;padding:28px 20px}.muted{color:#9da5bc}
+h1{font-size:34px;margin-bottom:8px}.workspace{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:25px}
+.panel{border:1px solid #2a3047;background:#111522;border-radius:15px;overflow:hidden;min-width:0}
+.heading{padding:17px;background:#171b2b;border-bottom:1px solid #2a3047;font-weight:bold}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:12px}#editor{width:100%;height:330px;resize:vertical;background:#0d101a;color:#dce2ff;border:0;outline:0;padding:16px;font:14px/1.6 Consolas,monospace;tab-size:2}
+#preview{width:100%;height:330px;border:0;background:white}#console{padding:12px;color:#aeb8d3;min-height:50px;white-space:pre-wrap;font:13px Consolas,monospace}
+.chat{margin-top:20px}.messages{height:210px;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:9px}
+.message{background:#20263a;padding:12px;border-radius:10px;white-space:pre-wrap;line-height:1.5;font-size:14px}.user{background:#3d2c62;align-self:flex-end;max-width:90%}
+.chatform{display:flex;gap:8px;padding:12px}.chatform input{flex:1;min-width:0;background:#0d101a;border:1px solid #424965;border-radius:9px;padding:12px;color:white}
+.quick{display:flex;gap:8px;flex-wrap:wrap;padding:0 12px}.quick button{font-size:12px;color:#d7c9ff;background:#29233e}
+#hint{font-size:12px;color:#a99adf;padding:0 14px 12px}.suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}.suggestions button{background:#29233e;color:#d7c9ff;font:12px Consolas,monospace}
+dialog{background:#131727;color:white;border:1px solid #424965;border-radius:14px;padding:24px;width:min(400px,90%)}dialog::backdrop{background:#000b}
+dialog input{width:100%;margin:7px 0 14px;padding:11px;border-radius:8px;border:1px solid #424965;background:#0d101a;color:white}
+@media(max-width:800px){.workspace{grid-template-columns:1fr}h1{font-size:28px}header{padding:16px 4%}.chatform{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header><div class="logo"><span>⚡</span> CODE AI</div><button id="account">Войти / Регистрация</button></header>
+<main>
+<h1>Привет, программист! 👋</h1>
+<p class="muted">Пиши код, запускай его и учись вместе с CODE AI.</p>
+<div class="workspace">
+<section class="panel">
+<div class="heading">📝 Редактор кода</div>
+<div class="toolbar">
+<select id="language"><option value="html">HTML</option><option value="css">CSS</option><option value="js" selected>JavaScript</option></select>
+<button class="primary" id="run">▶ Запустить</button><button id="clear">Очистить</button><button id="showHints">Подсказки</button>
+</div>
+<textarea id="editor" spellcheck="false"></textarea>
+<div id="hint">Подсказка: нажми «Подсказки» или Ctrl + Space.</div><div class="suggestions" id="suggestions"></div>
+</section>
+<section class="panel">
+<div class="heading">🌐 Результат</div><iframe id="preview" sandbox="allow-scripts"></iframe>
+<div class="heading">Консоль</div><pre id="console">Здесь появятся результаты.</pre>
+</section></div>
+<section class="panel chat">
+<div class="heading">🤖 CODE AI — Помощник</div>
+<div class="quick">
+<button data-q="Объясни мой код простыми словами.">Объясни код</button>
+<button data-q="Найди ошибки в моём коде.">Найди ошибки</button>
+<button data-q="Улучши мой код и объясни изменения.">Улучши код</button>
+<button data-q="Напиши пример кода для новичка.">Пример кода</button>
+</div>
+<div class="messages" id="messages"><div class="message">Привет! Я CODE AI. Пока это простая версия: редактор, подсказки и демонстрационный чат. Для настоящих ответов ИИ нужно подключить API через сервер.</div></div>
+<form class="chatform" id="chatform"><input id="question" placeholder="Напиши вопрос о программировании..." required><button class="primary">Отправить</button></form>
+</section>
+</main>
+<dialog id="auth">
+<h2 id="authTitle">Вход / Регистрация</h2>
+<form id="authform"><label>Электронная почта<input type="email" id="email" required></label><label>Пароль<input type="password" id="password" minlength="8" required></label><p id="authError" class="muted"></p><button class="primary" type="submit">Продолжить</button><button type="button" id="closeAuth">Закрыть</button></form>
+<p class="muted">Демонстрационная регистрация хранится только в этом браузере. Не используй настоящий пароль.</p>
+</dialog>
+<script>
+const $=s=>document.querySelector(s);
+const editor=$("#editor"),language=$("#language"),suggestions=$("#suggestions");
+const starters={
+js:'let score = 0;\n\nfunction addPoint() {\n  score++;\n  console.log("Счёт:", score);\n}\n\naddPoint();',
+html:'<!DOCTYPE html>\n<html lang="ru">\n<head>\n  <meta charset="UTF-8">\n  <title>Мой сайт</title>\n</head>\n<body>\n  <h1>Привет, мир!</h1>\n  <p>Мой первый сайт</p>\n</body>\n</html>',
+css:'body {\n  font-family: Arial, sans-serif;\n  background: #10151d;\n  color: white;\n  padding: 30px;\n}\nh1 { color: #8b5cf6; }'
+};
+editor.value=starters.js;
+const hintData={
+js:[["console.log()","console.log()"],["let","let "],["const","const "],["function","function myFunction() {\\n  \\n}"],["if / else","if (condition) {\\n  \\n} else {\\n  \\n}"],["for","for (let i = 0; i < 10; i++) {\\n  \\n}"]],
+html:[["h1","<h1>Заголовок</h1>"],["p","<p>Текст</p>"],["button",'<button type="button">Нажми</button>'],["div","<div>\\n  \\n</div>"],["img",'<img src="image.jpg" alt="Описание">']],
+css:[["color","color: #8b5cf6;"],["background","background: #10151d;"],["display: flex","display: flex;\\n  align-items: center;\\n  justify-content: center;"],["border-radius","border-radius: 12px;"],["padding","padding: 16px;"]]
+};
+function showHints(){suggestions.replaceChildren();hintData[language.value].forEach(([label,insert])=>{const b=document.createElement("button");b.textContent=label;b.onclick=()=>{editor.setRangeText(insert.replaceAll("\\n","\n"),editor.selectionStart,editor.selectionEnd,"end");editor.focus();suggestions.replaceChildren()};suggestions.append(b)});$("#hint").textContent="Нажми на подсказку, чтобы вставить её в редактор."}
+$("#showHints").onclick=showHints;
+editor.onkeydown=e=>{if(e.key==="Tab"){e.preventDefault();editor.setRangeText("  ",editor.selectionStart,editor.selectionEnd,"end")}if(e.ctrlKey&&e.code==="Space"){e.preventDefault();showHints()}if(e.key==="Escape")suggestions.replaceChildren()};
+language.onchange=()=>{editor.value=starters[language.value];suggestions.replaceChildren()};
+$("#clear").onclick=()=>{editor.value="";$("#console").textContent="Редактор очищен.";suggestions.replaceChildren()};
+$("#run").onclick=()=>{
+ const lang=language.value;
+ if(lang==="html"){ $("#preview").srcdoc=editor.value;$("#console").textContent="HTML запущен в предпросмотре.";return}
+ if(lang==="css"){ $("#preview").srcdoc='<html><head><style>'+editor.value.replace(/<\/style/gi,"<\\/style")+'</style></head><body><h1>Предпросмотр CSS</h1><p>Пример текста</p><button>Кнопка</button></body></html>';$("#console").textContent="CSS применён.";return}
+ $("#preview").srcdoc='<body style="font-family:Arial;padding:20px"><h2>JavaScript запущен</h2><p>Результат смотри в консоли.</p></body>';
+ const logs=[];const c={log:(...args)=>logs.push(args.map(x=>typeof x==="object"?JSON.stringify(x):String(x)).join(" "))};
+ try{new Function("console",'"use strict";\n'+editor.value)(c);$("#console").textContent=logs.join("\n")||"Код выполнен без вывода."}
+ catch(e){$("#console").textContent=e.name+": "+e.message}
+};
+function message(text,type="message"){const d=document.createElement("div");d.className="message "+type;d.textContent=text;$("#messages").append(d);$("#messages").scrollTop=$("#messages").scrollHeight}
+document.querySelectorAll("[data-q]").forEach(b=>b.onclick=()=>{$("#question").value=b.dataset.q;$("#question").focus()});
+$("#chatform").onsubmit=e=>{
+ e.preventDefault();const q=$("#question").value.trim();if(!q)return;
+ message(q,"user");$("#question").value="";
+ const s=q.toLowerCase(),code=editor.value;
+ let answer="Это демонстрационный режим. Чтобы получать ответы как настоящий ИИ-программист, нужно подключить API к серверу. Сейчас я могу дать простую подсказку: проверь синтаксис, имена переменных и скобки.";
+ if(s.includes("объясни")||s.includes("код"))answer="В редакторе сейчас выбран язык "+language.options[language.selectedIndex].text+".\n\nТвой код:\n"+code+"\n\nЧтобы объяснить его точнее, подключи ИИ API на сервере. Пока можешь нажать «Запустить» и посмотреть результат.";
+ if(s.includes("ошиб"))answer="Для проверки нажми «Запустить»: синтаксические ошибки JavaScript появятся в консоли. Для подробного объяснения ошибок нужен подключённый ИИ API.";
+ if(s.includes("улучш"))answer="Совет: используй понятные имена переменных, разбивай большие задачи на функции и проверяй код после каждого изменения.";
+ if(s.includes("пример"))answer="Пример JavaScript:\n\nlet score = 0;\nscore++;\nconsole.log(score);\n\nscore++ увеличивает значение на 1.";
+ message(answer);
+};
+const auth=$("#auth");let authMode="login";
+$("#account").onclick=()=>{authMode="login";$("#authTitle").textContent="Войти / Регистрация";auth.showModal()};
+$("#closeAuth").onclick=()=>auth.close();
+$("#authform").onsubmit=e=>{
+ e.preventDefault();const email=$("#email").value.trim().toLowerCase(),password=$("#password").value;
+ let users={};try{users=JSON.parse(localStorage.getItem("demo_users")||"{}")}catch{}
+ if(users[email]&&users[email]!==password){$("#authError").textContent="Неверный пароль.";return}
+ if(!users[email]){users[email]=password;localStorage.setItem("demo_users",JSON.stringify(users))}
+ $("#authError").textContent="Готово! Демонстрационный аккаунт сохранён в этом браузере.";
+ $("#account").textContent=email;
+};
+$("#preview").srcdoc=starters.html;
+</script>
+</body>
+</html>
